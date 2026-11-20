@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "etsy-mcp"
+version = "0.1.0"
+description = "Read-only Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec"
+requires-python = ">=3.12"
+dependencies = ["fastmcp>=3.2", "httpx"]
+
+[project.scripts]
+etsy-mcp = "etsy_mcp.server:main"
+etsy-mcp-login = "etsy_mcp.login:main"
+
+[tool.setuptools]
+packages = ["etsy_mcp"]
+
+[tool.setuptools.package-data]
+etsy_mcp = ["etsy-openapi.json"]
