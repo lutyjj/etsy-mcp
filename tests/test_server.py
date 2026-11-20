@@ -30,6 +30,16 @@ def test_every_operation_is_a_tool_tagged_by_method(tmp_path):
     assert {"delete", "ShopListing"} <= exposed["deleteListing"]
 
 
+def test_descriptions_drop_release_badges_but_keep_other_notices(tmp_path):
+    described = {tool.name: tool.description for tool in asyncio.run(server(tmp_path).list_tools())}
+
+    assert not [name for name, text in described.items() if "<div" in (text or "")]
+    assert described["getMe"].startswith("Returns basic info for the user making the request.")
+    assert described["getListingProperty"].startswith(
+        "Development for this endpoint is in progress. It will only return a 501 response."
+    )
+
+
 def test_includes_are_a_union_and_excludes_win(tmp_path):
     mcp = server(
         tmp_path,

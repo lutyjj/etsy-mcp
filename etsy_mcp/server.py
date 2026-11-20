@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import re
 from collections.abc import Iterator
 from importlib import resources
 
@@ -35,10 +36,32 @@ ROUTES = [
 ]
 
 
+# Etsy's operation descriptions open with HTML release badges, which every
+# tool description would repeat. A General Release badge says nothing; any
+# other (such as an endpoint that only answers 501) keeps its notice as text.
+BADGES = re.compile(r"^(?:\s*<div\b[^>]*>.*?</div>)+\s*", re.S)
+NOTICE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.S)
+
+
+def strip_badges(description: str) -> str:
+    badges = BADGES.match(description)
+    if not badges:
+        return description
+    rest = description[badges.end() :]
+    if "General Release" in badges.group(0):
+        return rest
+    notice = " ".join(NOTICE.findall(badges.group(0)))
+    return f"{notice}\n\n{rest}" if notice else rest
+
+
 def load_spec() -> dict:
-    return json.loads(
+    spec = json.loads(
         resources.files("etsy_mcp").joinpath("etsy-openapi.json").read_text()
     )
+    for op in operations(spec):
+        if "description" in op:
+            op["description"] = strip_badges(op["description"])
+    return spec
 
 
 def operations(spec: dict) -> Iterator[dict]:
