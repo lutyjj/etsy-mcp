@@ -24,7 +24,7 @@ Each tool carries Etsy's tags for its operation, such as `ShopListing` or `Shop 
 
 With no include set, the server exposes every tool. Any include turns the filter into an allowlist, and a tool stays if its name or one of its tags is included. Excludes then hide tools and win over includes. A name or tag that the spec does not have stops the server at start.
 
-For example, `ETSY_MCP_EXCLUDE_TAGS=delete` exposes everything except deletes, and `ETSY_MCP_EXCLUDE_TAGS=write,delete` makes the server read-only.
+For example, `ETSY_MCP_EXCLUDE_TAGS=delete` exposes everything except deletes, and `ETSY_MCP_EXCLUDE_TAGS=write,delete` makes the server read-only. The method tag follows the HTTP method alone, so `tokenScopes`, a POST that only reads the token's grant, counts as `write`.
 
 The NixOS module has the same four lists as options: `includeTools`, `includeTags`, `excludeTools` and `excludeTags`.
 

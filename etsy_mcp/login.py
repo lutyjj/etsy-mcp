@@ -37,6 +37,9 @@ def main() -> None:
     if args.scopes is None:
         server = build_server(settings, auth_token=None, tools=ToolFilter.from_env())
         args.scopes = " ".join(asyncio.run(required_scopes(server, load_spec())))
+    if not args.scopes:
+        # Etsy's consent screen needs at least one scope.
+        sys.exit("The exposed tools need no OAuth scopes; pass --scopes to log in anyway")
     print(f"Requesting scopes: {args.scopes}")
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
