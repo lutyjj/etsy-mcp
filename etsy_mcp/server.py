@@ -9,7 +9,7 @@ import re
 from collections.abc import Iterator
 from importlib import resources
 
-import httpx
+import httpx2
 from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, TokenVerifier
 from fastmcp.server.providers.openapi import MCPType, RouteMap
@@ -122,12 +122,15 @@ def build_server(
     settings: Settings,
     auth_token: str | None,
     tools: ToolFilter = ToolFilter(),
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> FastMCP:
+    """`transport` replaces the network for Etsy API calls (tests)."""
     spec = load_spec()
-    client = httpx.AsyncClient(
+    client = httpx2.AsyncClient(
         base_url=spec["servers"][0]["url"],
         auth=EtsyAuth(settings.keystring, settings.secret, TokenStore(settings.token_file)),
         timeout=30,
+        transport=transport,
     )
     mcp = FastMCP.from_openapi(
         openapi_spec=spec,

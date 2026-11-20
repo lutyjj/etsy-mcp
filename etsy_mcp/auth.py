@@ -17,7 +17,7 @@ from collections.abc import AsyncGenerator
 from contextlib import contextmanager
 from pathlib import Path
 
-import httpx
+import httpx2
 
 TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
 # Refresh this long before Etsy's stated expiry so a request never races it.
@@ -70,7 +70,7 @@ def tokens_from_response(payload: dict, now: float | None = None) -> dict:
     }
 
 
-class EtsyAuth(httpx.Auth):
+class EtsyAuth(httpx2.Auth):
     """Adds `x-api-key` and a fresh Bearer token; refreshes once on a 401."""
 
     def __init__(
@@ -78,17 +78,17 @@ class EtsyAuth(httpx.Auth):
         keystring: str,
         secret: str,
         store: TokenStore,
-        token_client: httpx.AsyncClient | None = None,
+        token_client: httpx2.AsyncClient | None = None,
     ):
         self._api_key = f"{keystring}:{secret}"
         self._client_id = keystring
         self._store = store
-        self._token_client = token_client or httpx.AsyncClient(timeout=30)
+        self._token_client = token_client or httpx2.AsyncClient(timeout=30)
         self._lock = asyncio.Lock()
 
     async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        self, request: httpx2.Request
+    ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
         token = await self._access_token()
         self._sign(request, token)
         response = yield request
@@ -97,7 +97,7 @@ class EtsyAuth(httpx.Auth):
             self._sign(request, token)
             yield request
 
-    def _sign(self, request: httpx.Request, token: str) -> None:
+    def _sign(self, request: httpx2.Request, token: str) -> None:
         request.headers["x-api-key"] = self._api_key
         request.headers["authorization"] = f"Bearer {token}"
 

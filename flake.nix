@@ -1,7 +1,7 @@
 {
   description = "Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec";
 
-  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-26.05/nixexprs.tar.xz";
+  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
 
   outputs =
     { self, nixpkgs }:
@@ -54,9 +54,13 @@
                 keystringFile = "/etc/etsy/keystring";
                 secretFile = "/etc/etsy/secret";
                 authTokenFile = "/etc/etsy/auth-token";
-                includeTools = [ "getShopReceipts" ];
-                includeTags = [ "Review" ];
+                includeTools = [ "ping" ];
+                includeTags = [
+                  "Review"
+                  "Shop Receipt"
+                ];
                 excludeTools = [ "getReviewsByShop" ];
+                excludeTags = [ "write" ];
               };
             };
             testScript = ''
@@ -82,7 +86,7 @@
               listed = machine.succeed(f"""{session} -d '{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}' {url}""")
               body = next((line[5:] for line in listed.splitlines() if line.startswith("data:")), listed)
               names = sorted(tool["name"] for tool in json.loads(body)["result"]["tools"])
-              assert names == ["getReviewsByListing", "getShopReceipts"], names
+              assert names == ["getReviewsByListing", "getShopReceipt", "getShopReceipts", "ping"], names
 
               # The login asks for the scopes of those tools alone; it then
               # stops at the empty redirect URL.
@@ -95,15 +99,8 @@
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          packages = [
-            (pkgs.python3.withPackages (
-              ps: with ps; [
-                fastmcp
-                httpx
-                pytest
-              ]
-            ))
-          ];
+          inputsFrom = [ self.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+          packages = [ pkgs.python3Packages.pytest ];
         };
       });
 

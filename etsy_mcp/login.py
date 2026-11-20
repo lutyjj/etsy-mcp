@@ -15,7 +15,7 @@ import secrets
 import sys
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-import httpx
+import httpx2
 
 from .auth import TOKEN_URL, TokenStore, tokens_from_response
 from .config import Settings, ToolFilter
@@ -59,7 +59,7 @@ def main() -> None:
     if "code" not in returned:
         sys.exit(f"No code in the URL: {returned.get('error', ['unknown error'])[0]}")
 
-    response = httpx.post(
+    response = httpx2.post(
         TOKEN_URL,
         headers={"x-api-key": f"{settings.keystring}:{settings.secret}"},
         data={

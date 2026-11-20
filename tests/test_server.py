@@ -1,10 +1,14 @@
 """Which tools the generated server exposes, and the OAuth scopes they need."""
 
 import asyncio
+import time
+from urllib.parse import parse_qs
 
+import httpx2
 import pytest
 from fastmcp.exceptions import NotFoundError
 
+from etsy_mcp.auth import TokenStore
 from etsy_mcp.config import Settings, ToolFilter
 from etsy_mcp.server import build_server, load_spec, required_scopes
 
@@ -38,6 +42,32 @@ def test_descriptions_drop_release_badges_but_keep_other_notices(tmp_path):
     assert described["getListingProperty"].startswith(
         "Development for this endpoint is in progress. It will only return a 501 response."
     )
+
+
+def test_write_tools_send_the_body_encoding_the_spec_declares(tmp_path):
+    # Etsy declares application/x-www-form-urlencoded for updateListing and
+    # rejects JSON bodies on such endpoints.
+    TokenStore(tmp_path / "tokens.json").save(
+        {"access_token": "a", "refresh_token": "r", "expires_at": time.time() + 3600}
+    )
+    sent = []
+
+    def etsy(request):
+        sent.append(request)
+        return httpx2.Response(200, json={"listing_id": 2})
+
+    mcp = build_server(
+        Settings("key", "sec", tmp_path / "tokens.json"),
+        auth_token="t",
+        transport=httpx2.MockTransport(etsy),
+    )
+    asyncio.run(mcp.call_tool("updateListing", {"shop_id": 1, "listing_id": 2, "title": "Frame", "should_auto_renew": True}))
+
+    [request] = sent
+    assert (request.method, request.url.path) == ("PATCH", "/v3/application/shops/1/listings/2")
+    assert request.headers["content-type"].startswith("application/x-www-form-urlencoded")
+    assert parse_qs(request.content.decode()) == {"title": ["Frame"], "should_auto_renew": ["true"]}
+    assert request.headers["authorization"] == "Bearer a"
 
 
 def test_includes_are_a_union_and_excludes_win(tmp_path):

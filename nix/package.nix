@@ -1,5 +1,11 @@
-{ lib, python3Packages }:
-
+{
+  lib,
+  callPackage,
+  python3Packages,
+}:
+let
+  fastmcp = callPackage ./fastmcp.nix { };
+in
 python3Packages.buildPythonApplication {
   pname = "etsy-mcp";
   version = "0.1.0";
@@ -15,11 +21,14 @@ python3Packages.buildPythonApplication {
   };
 
   build-system = [ python3Packages.setuptools ];
-  dependencies = with python3Packages; [
+  dependencies = [
     fastmcp
-    httpx
-  ];
+    python3Packages.httpx2
+  ]
+  ++ fastmcp.optional-dependencies.server;
   nativeCheckInputs = [ python3Packages.pytestCheckHook ];
+
+  passthru = { inherit fastmcp; };
 
   meta = {
     description = "Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec";

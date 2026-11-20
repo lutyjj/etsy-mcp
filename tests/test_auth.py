@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 
-import httpx
+import httpx2
 import pytest
 
 from etsy_mcp.auth import EtsyAuth, NotLoggedIn, TokenStore
@@ -20,16 +20,16 @@ def make(tmp_path, tokens, api_handler):
         form = dict(x.split("=") for x in request.content.decode().split("&"))
         refreshes.append(form["refresh_token"])
         n = len(refreshes)
-        return httpx.Response(200, json={"access_token": f"a{n}", "refresh_token": f"r{n}", "expires_in": 3600})
+        return httpx2.Response(200, json={"access_token": f"a{n}", "refresh_token": f"r{n}", "expires_in": 3600})
 
-    auth = EtsyAuth("key", "sec", store, httpx.AsyncClient(transport=httpx.MockTransport(token_handler)))
-    api = httpx.AsyncClient(transport=httpx.MockTransport(api_handler), auth=auth, base_url="https://etsy.test")
+    auth = EtsyAuth("key", "sec", store, httpx2.AsyncClient(transport=httpx2.MockTransport(token_handler)))
+    api = httpx2.AsyncClient(transport=httpx2.MockTransport(api_handler), auth=auth, base_url="https://etsy.test")
     return store, api, refreshes
 
 
 def ok(request):
     assert request.headers["x-api-key"] == "key:sec"
-    return httpx.Response(200, json={"bearer": request.headers["authorization"]})
+    return httpx2.Response(200, json={"bearer": request.headers["authorization"]})
 
 
 def test_expired_token_refreshes_once_and_persists_rotation(tmp_path):
@@ -58,7 +58,7 @@ def test_concurrent_requests_share_one_refresh(tmp_path):
 def test_rejected_fresh_token_is_refreshed_and_retried(tmp_path):
     def api_handler(request):
         if request.headers["authorization"] == "Bearer revoked":
-            return httpx.Response(401)
+            return httpx2.Response(401)
         return ok(request)
 
     tokens = {"access_token": "revoked", "refresh_token": "r0", "expires_at": time.time() + 3600}
