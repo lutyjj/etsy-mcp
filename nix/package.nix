@@ -22,7 +22,7 @@ python3Packages.buildPythonApplication {
   nativeCheckInputs = [ python3Packages.pytestCheckHook ];
 
   meta = {
-    description = "Read-only Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec";
+    description = "Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec";
     mainProgram = "etsy-mcp";
   };
 }

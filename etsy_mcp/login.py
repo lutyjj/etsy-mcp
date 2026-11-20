@@ -8,6 +8,7 @@ from the address bar back here.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import base64
 import hashlib
 import secrets
@@ -17,19 +18,26 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import httpx
 
 from .auth import TOKEN_URL, TokenStore, tokens_from_response
-from .config import Settings
+from .config import Settings, ToolFilter
+from .server import build_server, load_spec, required_scopes
 
 AUTHORIZE_URL = "https://www.etsy.com/oauth/connect"
-DEFAULT_SCOPES = "shops_r listings_r transactions_r"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="etsy-mcp-login", description=__doc__)
     parser.add_argument("--redirect-uri", required=True, help="HTTPS URI registered in the Etsy app")
-    parser.add_argument("--scopes", default=DEFAULT_SCOPES, help=f"default: {DEFAULT_SCOPES}")
+    parser.add_argument(
+        "--scopes",
+        help="space-separated OAuth scopes; default: what the tools the ETSY_MCP_* filter exposes need",
+    )
     args = parser.parse_args()
 
     settings = Settings.from_env()
+    if args.scopes is None:
+        server = build_server(settings, auth_token=None, tools=ToolFilter.from_env())
+        args.scopes = " ".join(asyncio.run(required_scopes(server, load_spec())))
+    print(f"Requesting scopes: {args.scopes}")
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = secrets.token_urlsafe(24)

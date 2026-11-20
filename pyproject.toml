@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "etsy-mcp"
 version = "0.1.0"
-description = "Read-only Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec"
+description = "Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec"
 requires-python = ">=3.12"
 dependencies = ["fastmcp>=3.2", "httpx"]
 
