@@ -5,16 +5,20 @@
 }:
 let
   fastmcp = callPackage ./fastmcp.nix { };
+  # Release Please bumps the version in pyproject.toml alone.
+  project = (lib.importTOML ../pyproject.toml).project;
 in
 python3Packages.buildPythonApplication {
-  pname = "etsy-mcp";
-  version = "0.1.0";
+  pname = project.name;
+  inherit (project) version;
   pyproject = true;
 
   src = lib.fileset.toSource {
     root = ../.;
     fileset = lib.fileset.unions [
       ../pyproject.toml
+      ../README.md
+      ../LICENSE
       ../etsy_mcp
       ../tests
     ];
@@ -31,7 +35,8 @@ python3Packages.buildPythonApplication {
   passthru = { inherit fastmcp; };
 
   meta = {
-    description = "Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec";
+    inherit (project) description;
+    license = lib.licenses.mit;
     mainProgram = "etsy-mcp";
   };
 }

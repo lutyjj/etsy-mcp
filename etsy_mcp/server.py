@@ -8,12 +8,14 @@ import os
 import re
 from collections.abc import Iterator
 from importlib import resources
+from typing import Any
 
 import httpx2
 from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, TokenVerifier
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from fastmcp.server.transforms import Visibility
+from fastmcp.utilities.openapi import HttpMethod
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -23,7 +25,7 @@ from .config import Settings, ToolFilter, read_secret
 # Every operation becomes a tool. Besides Etsy's own tags (`ShopListing`,
 # `Shop Receipt`, ...), each carries one of these by HTTP method, so a filter
 # can drop all writes or all deletes at once.
-METHOD_TAGS = {
+METHOD_TAGS: dict[HttpMethod, str] = {
     "GET": "read",
     "POST": "write",
     "PUT": "write",
@@ -39,8 +41,8 @@ ROUTES = [
 # Etsy's operation descriptions open with HTML release badges, which every
 # tool description would repeat. A General Release badge says nothing; any
 # other (such as an endpoint that only answers 501) keeps its notice as text.
-BADGES = re.compile(r"^(?:\s*<div\b[^>]*>.*?</div>)+\s*", re.S)
-NOTICE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.S)
+BADGES = re.compile(r"^(?:\s*<div\b[^>]*>.*?</div>)+\s*", re.DOTALL)
+NOTICE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.DOTALL)
 
 
 def strip_badges(description: str) -> str:
@@ -54,28 +56,31 @@ def strip_badges(description: str) -> str:
     return f"{notice}\n\n{rest}" if notice else rest
 
 
-def load_spec() -> dict:
-    spec = json.loads(
-        resources.files("etsy_mcp").joinpath("etsy-openapi.json").read_text()
-    )
+# Etsy's OpenAPI document and its operations, as parsed JSON.
+Spec = dict[str, Any]
+Operation = dict[str, Any]
+
+
+def load_spec() -> Spec:
+    spec: Spec = json.loads(resources.files("etsy_mcp").joinpath("etsy-openapi.json").read_text())
     for op in operations(spec):
         if "description" in op:
             op["description"] = strip_badges(op["description"])
     return spec
 
 
-def operations(spec: dict) -> Iterator[dict]:
+def operations(spec: Spec) -> Iterator[Operation]:
     for path in spec["paths"].values():
         for method, op in path.items():
             if method.upper() in METHOD_TAGS:
                 yield op
 
 
-def oauth_scopes(op: dict) -> set[str]:
+def oauth_scopes(op: Operation) -> set[str]:
     return {scope for requirement in op.get("security", []) for scopes in requirement.values() for scope in scopes}
 
 
-def apply_filter(mcp: FastMCP, spec: dict, tools: ToolFilter) -> None:
+def apply_filter(mcp: FastMCP, spec: Spec, tools: ToolFilter) -> None:
     names = {op["operationId"] for op in operations(spec)}
     tags = set(METHOD_TAGS.values()) | {tag for op in operations(spec) for tag in op.get("tags", [])}
     # A misspelt name would otherwise filter nothing, silently.
@@ -99,7 +104,7 @@ def apply_filter(mcp: FastMCP, spec: dict, tools: ToolFilter) -> None:
         mcp.disable(tags=set(tools.exclude_tags))
 
 
-async def required_scopes(mcp: FastMCP, spec: dict) -> list[str]:
+async def required_scopes(mcp: FastMCP, spec: Spec) -> list[str]:
     """The OAuth scopes the exposed tools need, per Etsy's spec."""
     by_name = {op["operationId"]: oauth_scopes(op) for op in operations(spec)}
     return sorted(set().union(*(by_name[tool.name] for tool in await mcp.list_tools())))

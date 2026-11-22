@@ -54,5 +54,12 @@ curl -sL https://www.etsy.com/openapi/generated/oas/3.0.0.json -o etsy_mcp/etsy-
 
 ```sh
 nix develop -c python -m pytest -q
-nix build .#checks.x86_64-linux.module   # NixOS VM test of the module
+nix develop -c sh -c 'ruff check . && ruff format --check . && mypy'
+nix flake check   # all of the above, nixfmt, and a NixOS VM test of the module
 ```
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/); Release Please turns them into the release pull request and the changelog.
+
+## License
+
+[MIT](LICENSE)

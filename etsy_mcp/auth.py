@@ -13,9 +13,10 @@ import fcntl
 import json
 import os
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, TypedDict, cast
 
 import httpx2
 
@@ -28,6 +29,14 @@ class NotLoggedIn(RuntimeError):
     pass
 
 
+class Tokens(TypedDict):
+    """The token file's contents; `expires_at` is a Unix time."""
+
+    access_token: str
+    refresh_token: str
+    expires_at: float
+
+
 class TokenStore:
     """JSON token file written atomically with mode 0600, locked by a sibling file."""
 
@@ -36,7 +45,7 @@ class TokenStore:
         self._lock_path = path.with_name(path.name + ".lock")
 
     @contextmanager
-    def locked(self):
+    def locked(self) -> Iterator[None]:
         fd = os.open(self._lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
@@ -45,22 +54,22 @@ class TokenStore:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
-    def load(self) -> dict | None:
+    def load(self) -> Tokens | None:
         try:
-            return json.loads(self.path.read_text())
+            return cast(Tokens, json.loads(self.path.read_text()))
         except FileNotFoundError:
             return None
 
-    def save(self, tokens: dict) -> None:
+    def save(self, tokens: Tokens) -> None:
         tmp = self.path.with_name(f"{self.path.name}.tmp.{os.getpid()}")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
             json.dump(tokens, f, indent=2)
             f.write("\n")
-        os.replace(tmp, self.path)
+        tmp.replace(self.path)
 
 
-def tokens_from_response(payload: dict, now: float | None = None) -> dict:
+def tokens_from_response(payload: dict[str, Any], now: float | None = None) -> Tokens:
     """What we keep from a token endpoint response; expires_at is absolute."""
     now = time.time() if now is None else now
     return {
@@ -86,9 +95,7 @@ class EtsyAuth(httpx2.Auth):
         self._token_client = token_client or httpx2.AsyncClient(timeout=30)
         self._lock = asyncio.Lock()
 
-    async def async_auth_flow(
-        self, request: httpx2.Request
-    ) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
+    async def async_auth_flow(self, request: httpx2.Request) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
         token = await self._access_token()
         self._sign(request, token)
         response = yield request
@@ -106,9 +113,7 @@ class EtsyAuth(httpx2.Auth):
             with self._store.locked():
                 tokens = self._store.load()
                 if not tokens or not tokens.get("refresh_token"):
-                    raise NotLoggedIn(
-                        f"No Etsy OAuth tokens in {self._store.path}; run etsy-mcp-login"
-                    )
+                    raise NotLoggedIn(f"No Etsy OAuth tokens in {self._store.path}; run etsy-mcp-login")
                 current = tokens["access_token"]
                 fresh = tokens["expires_at"] - EXPIRY_MARGIN_SECONDS > time.time()
                 # Another process may have refreshed since the token was rejected.
@@ -118,7 +123,7 @@ class EtsyAuth(httpx2.Auth):
                 self._store.save(tokens)
                 return tokens["access_token"]
 
-    async def _refresh(self, refresh_token: str) -> dict:
+    async def _refresh(self, refresh_token: str) -> Tokens:
         response = await self._token_client.post(
             TOKEN_URL,
             headers={"x-api-key": self._api_key},
@@ -130,7 +135,5 @@ class EtsyAuth(httpx2.Auth):
         )
         if response.status_code != 200:
             # The body names the OAuth error only; it never echoes tokens.
-            raise RuntimeError(
-                f"Etsy token refresh failed: HTTP {response.status_code} {response.text[:200]}"
-            )
+            raise RuntimeError(f"Etsy token refresh failed: HTTP {response.status_code} {response.text[:200]}")
         return tokens_from_response(response.json())

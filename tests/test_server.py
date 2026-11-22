@@ -61,7 +61,9 @@ def test_write_tools_send_the_body_encoding_the_spec_declares(tmp_path):
         auth_token="t",
         transport=httpx2.MockTransport(etsy),
     )
-    asyncio.run(mcp.call_tool("updateListing", {"shop_id": 1, "listing_id": 2, "title": "Frame", "should_auto_renew": True}))
+    asyncio.run(
+        mcp.call_tool("updateListing", {"shop_id": 1, "listing_id": 2, "title": "Frame", "should_auto_renew": True})
+    )
 
     [request] = sent
     assert (request.method, request.url.path) == ("PATCH", "/v3/application/shops/1/listings/2")

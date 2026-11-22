@@ -1,5 +1,5 @@
 {
-  description = "Etsy Open API v3 MCP server generated from Etsy's OpenAPI spec";
+  description = "MCP server for the Etsy Open API v3, generated from Etsy's OpenAPI spec";
 
   inputs.nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
 
@@ -33,9 +33,36 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          package = self.packages.${system}.default;
         in
         {
-          package = self.packages.${system}.default;
+          inherit package;
+          # Ruff's lint and format, mypy against the locked dependencies, and
+          # nixfmt over the Nix files.
+          lint =
+            pkgs.runCommand "etsy-mcp-lint"
+              {
+                nativeBuildInputs = [
+                  pkgs.ruff
+                  pkgs.nixfmt
+                  (pkgs.python3.withPackages (
+                    ps:
+                    [
+                      ps.mypy
+                      ps.pytest
+                    ]
+                    ++ package.dependencies
+                  ))
+                ];
+              }
+              ''
+                cd ${package.src}
+                ruff check --no-cache .
+                ruff format --check --no-cache .
+                mypy --cache-dir "$TMPDIR/mypy"
+                nixfmt --check ${./flake.nix} ${./nix}/*.nix
+                touch $out
+              '';
           # Boots the service as deployed and checks the MCP endpoint's contract:
           # health is open, /mcp refuses a wrong token and serves the right one,
           # and the module's tool filter reaches both the server and the login.
@@ -100,7 +127,11 @@
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           inputsFrom = [ self.packages.${pkgs.stdenv.hostPlatform.system}.default ];
-          packages = [ pkgs.python3Packages.pytest ];
+          packages = [
+            pkgs.ruff
+            pkgs.python3Packages.mypy
+            pkgs.python3Packages.pytest
+          ];
         };
       });
 
