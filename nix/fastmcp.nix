@@ -6,18 +6,18 @@
 { fetchFromGitHub, python3Packages }:
 
 python3Packages.fastmcp-slim.overridePythonAttrs (old: rec {
-  version = "4.2.3";
+  version = "4.2.4";
   src = fetchFromGitHub {
     owner = "PrefectHQ";
     repo = "fastmcp";
     tag = "v${version}";
-    hash = "sha256-96PHLL5WKRF2BJ8zDZ8RRuE5TEx4ieafcOuaKKdSpKI=";
+    hash = "sha256-KxsyGuZCtWlXZYqOOS4uEK1M7BeqaxwvclGBuF/IBLA=";
   };
   sourceRoot = "${src.name}/fastmcp_slim";
   # The 3.4.7 backport is upstream in 4.x.
   patches = [ ];
   # authlib, joserfc, openapi-pydantic, opentelemetry-api and py-key-value-aio
-  # are a patch release or two below 4.2.3's floors on unstable.
+  # are a patch release or two below 4.2.4's floors on unstable.
   pythonRelaxDeps = true;
   dependencies = old.dependencies ++ [ python3Packages.mcp-types ];
   optional-dependencies = old.optional-dependencies // {
