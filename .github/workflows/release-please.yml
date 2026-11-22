@@ -1,0 +1,27 @@
+name: Release Please
+
+# Keeps the release pull request up to date from the Conventional Commits on
+# main: the version in pyproject.toml and CHANGELOG.md. Merging it tags vX.Y.Z
+# and publishes the GitHub release; the flake at that tag is the release.
+on:
+  push:
+    branches: [main]
+  # Refreshes the release pull request on demand.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # tags the release and writes the release branch
+      issues: write # labels the release pull request
+      pull-requests: write # opens and updates the release pull request
+    steps:
+      # With the default token, checks on the release pull request wait for
+      # "Approve and run"; a RELEASE_PLEASE_TOKEN fine-grained PAT starts them
+      # at once.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
